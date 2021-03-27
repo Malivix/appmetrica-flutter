@@ -1,36 +1,68 @@
 package com.lionid.appmetrica_flutter.appmetrica_flutter_sdk
 
+import android.util.Log;
+import android.app.Application
+import android.content.Context
 import androidx.annotation.NonNull
-
+import com.yandex.metrica.YandexMetrica
+import com.yandex.metrica.YandexMetricaConfig
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import io.flutter.plugin.common.PluginRegistry.Registrar
 
-/** AppmetricaFlutterSdkPlugin */
+
 class AppmetricaFlutterSdkPlugin: FlutterPlugin, MethodCallHandler {
-  /// The MethodChannel that will the communication between Flutter and native Android
-  ///
-  /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-  /// when the Flutter Engine is detached from the Activity
-  private lateinit var channel : MethodChannel
+  private val CHANNEL_NAME = "appmetrica_flutter_sdk"
 
-  override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-    channel = MethodChannel(flutterPluginBinding.binaryMessenger, "appmetrica_flutter_sdk")
+
+  private lateinit var channel : MethodChannel
+  private var applicationContext: Context? = null
+  private var application: Application? = null
+
+  override fun onAttachedToEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+    applicationContext = binding.applicationContext
+    application = applicationContext as Application
+    channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
     channel.setMethodCallHandler(this)
   }
 
+  override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+    channel.setMethodCallHandler(null);
+    applicationContext = null;
+  }
+
   override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
-    if (call.method == "getPlatformVersion") {
-      result.success("Android ${android.os.Build.VERSION.RELEASE}")
-    } else {
-      result.notImplemented()
+    when (call.method) {
+      "activate" -> handleActivate(call, result)
+      else -> result.notImplemented()
     }
   }
 
-  override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
-    channel.setMethodCallHandler(null)
+
+  private fun handleActivate(call: MethodCall, result: Result) {
+    try {
+      val arguments = call.arguments as Map<*, *>
+
+      // Get activation parameters.
+      val apiKey = arguments["apiKey"] as String?
+      val locationTracking = arguments["locationTracking"] as Boolean
+      val crashReporting = arguments["crashReporting"] as Boolean
+
+      // Creating an extended library configuration.
+      val config = YandexMetricaConfig.newConfigBuilder(apiKey!!)
+              .withLogs()
+              .withLocationTracking(locationTracking)
+              .withCrashReporting(crashReporting)
+              .build()
+
+      YandexMetrica.activate(applicationContext!!, config);
+      YandexMetrica.enableActivityAutoTracking(application!!);
+    } catch (e: Exception) {
+      Log.e(CHANNEL_NAME, e.message, e);
+      return result.success(false)
+    }
+    result.success(true)
   }
 }

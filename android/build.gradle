@@ -33,6 +33,10 @@ android {
     defaultConfig {
         minSdkVersion 16
     }
+
+    dependencies {
+        implementation 'com.yandex.android:mobmetricalib:3.18.0'
+    }
 }
 
 dependencies {
